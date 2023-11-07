@@ -10,7 +10,7 @@
  * @date 10/28/2022
  */
 
-const MAX_BLOBS = 100; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
+const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
 const STIFFNESS_STRETCH = 1.0; // TODO: Set as you wish
@@ -507,25 +507,59 @@ class Blob {
 
 		}
 	}
-	// Loops over blob particles and accumulates bending forces (Particle.f += ...)
-	gatherForces_Bend() {
-		let k = STIFFNESS_BEND;
-		for (let i = 0; i < this.n; i++) {
-			// FIND particles before (p0) and after (p2) particle i (p1): 
-			//let p0 = ????
-			let p1 = this.BP[i];
-			let p2 = this.BP[(i + 1) % this.n];
+// Loops over blob particles and accumulates bending forces (Particle.f += ...)
+gatherForces_Bend() {
+    let k = STIFFNESS_BEND;
+    for (let i = 0; i < this.n; i++) {
+        let prevIdx = (i - 1 + this.n) % this.n;
+        let nextIdx = (i + 1) % this.n;
+        let p0 = this.BP[prevIdx];
+        let p1 = this.BP[i];
+        let p2 = this.BP[nextIdx];
 
-			// TODO
+        let edge1 = p5.Vector.sub(p1.p, p0.p);
+        let edge2 = p5.Vector.sub(p2.p, p1.p);
 
-		}
-	}
-	// Loops over blob particles and gathers area compression forces (Particle.f += ...)
-	gatherForces_Area() {
-		let k = STIFFNESS_AREA;
-		// TODO 
+        let angle = edge1.angleBetween(edge2);
+        let restAngle = 0; 
 
-	}
+        let forceMagnitude = k * (angle - restAngle);
+        let forceDirection = edge1.copy().rotate(HALF_PI); 
+
+        let force = forceDirection.setMag(forceMagnitude);
+        p1.f.add(force);
+        p2.f.sub(force); 
+    }
+}
+
+// Loops over blob particles and gathers area compression forces (Particle.f += ...)
+gatherForces_Area() {
+    let k = .8;
+
+    let area = 0;
+    for (let i = 0; i < this.n; i++) {
+        let j = (i + 1) % this.n;
+        area += this.BP[i].p.x * this.BP[j].p.y;
+        area -= this.BP[j].p.x * this.BP[i].p.y;
+    }
+    area = Math.abs(area)/2;
+    let restArea = Math.PI * this.radius * this.radius;
+    let areaDifference = area - restArea;
+		console.log('area', areaDifference);
+ 
+    if (areaDifference > 0) {
+        let com = this.centerOfMass(); // Use the centerOfMass() method you already have
+
+        for (let i = 0; i < this.n; i++) {
+            let particle = this.BP[i];
+            let dir = p5.Vector.sub(com, particle.p).normalize();
+            let forceMagnitude = k * areaDifference;
+            particle.f.add(dir.mult(forceMagnitude));
+        }
+    }
+}
+
+
 
 	// Center of mass of all blob particles
 	centerOfMass() {
@@ -603,20 +637,59 @@ class Blob {
 		pop();
 	}
 
-	drawBlobFace() {
-		push();
-		// TODO: Draw your face here! :D 
+drawBlobFace() {
+  push();
+  let com = this.centerOfMass();
+  let eyeSpacing = this.radius / 3; 
+  let eyeSize = this.radius / 5;
 
-		// CENTER OF MASS eyeball for now :/
-		let com = this.centerOfMass();
-		let cov = this.centerOfVelocity();
-		stroke(0);
-		fill(255);
-		circle(com.x, com.y, 5 * PARTICLE_RADIUS);
-		fill(0);
-		circle(com.x + 0.01 * cov.x + 3 * sin(nTimesteps / 3), com.y + 0.01 * cov.y + random(-1, 1), PARTICLE_RADIUS);
-		pop();
-	}
+  // Eyes
+  fill(255); 
+  ellipse(com.x - eyeSpacing, com.y, eyeSize, eyeSize); 
+  ellipse(com.x + eyeSpacing, com.y, eyeSize, eyeSize); 
+	
+  // Pupils
+  fill(0); 
+  let pupilSize = eyeSize / 2;
+  ellipse(com.x - eyeSpacing, com.y, pupilSize, pupilSize); 
+  ellipse(com.x + eyeSpacing, com.y, pupilSize, pupilSize); 
+
+  // Mouth
+  let mouthWidth = this.radius / 2;
+  let mouthHeight = this.radius / 10;
+  let mouthYOffset = eyeSize * 1.5; 
+  noFill();
+  stroke(0);
+  strokeWeight(2);
+  arc(com.x, com.y + mouthYOffset, mouthWidth, mouthHeight, 0, PI); 
+
+  pop();
+}
+
+
+
+
+
+	aabb() {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+
+    for (let particle of this.BP) {
+        if (particle.p.x < minX) minX = particle.p.x;
+        if (particle.p.x > maxX) maxX = particle.p.x;
+        if (particle.p.y < minY) minY = particle.p.y;
+        if (particle.p.y > maxY) maxY = particle.p.y;
+    }
+
+    return {
+        minX: minX,
+        maxX: maxX,
+        minY: minY,
+        maxY: maxY
+    };
+}
 
 }
 
