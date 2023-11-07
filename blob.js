@@ -10,10 +10,11 @@
  * @date 10/28/2022
  */
 
+const D0 = 5
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
-const STIFFNESS_STRETCH = 1.0; // TODO: Set as you wish
+const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
 const STIFFNESS_BEND = 1.0; //    TODO: Set as you wish
 const STIFFNESS_AREA = 1.0; //    TODO: Set as you wish
 
@@ -176,15 +177,24 @@ function checkEdgeEdgeOverlap(ei, ej) {
 
 // Computes penalty forces between all point-edge pairs
 function gatherParticleForces_Penalty() {
-
-	let warmup = true;
-	if (warmup) { // First just consider rigid environment edges:
-		for (let edge of environment.getEdges()) {
-			// TODO (part1): Apply point-edge force (if pt not on edge!)
-		}
-	} else { // Consider all rigid + blob edges:
-		for (let edge of edges) {
-			// TODO (part2): Apply point-edge force (if pt not on edge!)
+	for (let edge of edges) {
+		// TODO (part2): Apply point-edge force (if pt not on edge!)
+		for (let particle of particles) {
+			if (edge.q == particle || edge.r == particle) {
+				continue;
+			}
+			let qp = sub(edge.q.p, particle.p);
+			let rp = sub(edge.r.p, particle.p);
+			let alpha = dot(qp, sub(qp, rp)) / (length(sub(qp, rp)) ** 2);
+			alpha = clamp(alpha, 0, 1);
+			let c = add(qp, sub(rp, qp).mult(alpha));
+			let distance = length(c);
+			if (distance >= D0) continue;
+			let nHat = c.normalize();
+			if (D0 - distance > 0) {
+				nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
+				particle.f.add(nHat);
+			}
 		}
 	}
 }
