@@ -519,27 +519,41 @@ class Blob {
 	}
 // Loops over blob particles and accumulates bending forces (Particle.f += ...)
 gatherForces_Bend() {
-    let k = STIFFNESS_BEND;
-    for (let i = 0; i < this.n; i++) {
-        let prevIdx = (i - 1 + this.n) % this.n;
-        let nextIdx = (i + 1) % this.n;
-        let p0 = this.BP[prevIdx];
-        let p1 = this.BP[i];
-        let p2 = this.BP[nextIdx];
-
-        let edge1 = p5.Vector.sub(p1.p, p0.p);
-        let edge2 = p5.Vector.sub(p2.p, p1.p);
-
-        let angle = edge1.angleBetween(edge2);
-        let restAngle = 0; 
-
-        let forceMagnitude = k * (angle - restAngle);
-        let forceDirection = edge1.copy().rotate(HALF_PI); 
-
-        let force = forceDirection.setMag(forceMagnitude);
-        p1.f.add(force);
-        p2.f.sub(force); 
-    }
+	let k = STIFFNESS_BEND;
+  	for (let i = 0; i < this.n; i++) {
+		let prevIdx = (i - 1 + this.n) % this.n;
+		let nextIdx = (i + 1) % this.n;
+		let p0 = this.BP[prevIdx];
+		let p1 = this.BP[i];
+		let p2 = this.BP[nextIdx];
+		
+		let edge1 = p5.Vector.sub(p1.p, p0.p);
+		let edge2 = p5.Vector.sub(p2.p, p1.p);
+		let edge1Length = length(edge1);
+		let edge2Length = length(edge2);
+		edge1.normalize();
+		edge2.normalize();
+		let edge1Copy = edge1.copy();
+		let edge2Copy = edge2.copy();
+		let dotted = dot(edge1, edge2)
+		
+		edge1Copy.mult(-1)
+		acc(edge2Copy, dotted, edge1)
+		edge2Copy.mult(-k / (2 * edge1Length))
+		let f0 = edge2Copy;
+		
+		edge1Copy = edge1.copy();
+		edge2Copy = edge2.copy();
+		edge2Copy.mult(-1);
+		acc(edge1Copy, dotted, edge2)
+		edge1Copy.mult(-k / (2 * edge2Length))
+		let f2 = edge1Copy;
+		let f1 = -f0 - f2;
+		
+		p0.f.add(f0);
+		p1.f.add(f1);
+		p2.f.add(f2);
+	}
 }
 
 // Loops over blob particles and gathers area compression forces (Particle.f += ...)
