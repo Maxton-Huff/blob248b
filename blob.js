@@ -169,22 +169,37 @@ function verifyNoEdgeEdgeOverlap() {
 	}
 }
 
-// Function to check if two edges overlap (COULD BE INCORRECT)
+// Function to check if two edges overlap (INCORRECT)
 function checkEdgeEdgeOverlap(ei, ej) {
-	const dx1 = ei.q.p.x - ei.r.p.x;
-	const dy1 = ei.q.p.y - ei.r.p.y;
-	const dx2 = ej.q.p.x - ej.r.p.x;
-	const dy2 = ej.q.p.y - ej.r.p.y;
-	const determinant = dx1 * dy2 - dx2 * dy1;
-
-	if (determinant === 0) {
-		// Line segments are parallel, and there can be no intersection
-		return false;
-	}
-	const t1 = ((ej.q.p.x - ei.r.p.x) * dy2 - (ej.q.p.y - ei.r.p.y) * dx2) / determinant;
-  const t2 = ((ej.q.p.x - ei.r.p.x) * dy1 - (ej.q.p.y - ei.r.p.y) * dx1) / determinant;
-  return t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1;
+	let p1 = ei.q.p;
+	let p2 = ei.r.p;
+	let q1 = ej.q.p;
+	let q2 = ej.r.p;
+	let o1 = orientation(p1, p2, q1); 
+	let o2 = orientation(p1, p2, q2); 
+	let o3 = orientation(q1, q2, p1); 
+	let o4 = orientation(q1, q2, p2);
+	print("orientations: ", o1,o2,o3,o4);
+	if (o1 != o2 && o3 != o4 && o1 && o2 && o3 && o4) return true;
+	// if (o1 == 0 && onSegment(p1, p2, q1)) return true; 
+	// if (o2 == 0 && onSegment(p1, q2, q1)) return true; 
+	// if (o3 == 0 && onSegment(p2, p1, q2)) return true; 
+	// if (o4 == 0 && onSegment(p2, q1, q2)) return true; 
+	return false; // Doesn't fall in any of the above cases
 }
+
+function orientation(p, q, r) {
+	print("points: ", p,q,r);
+	let orient = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y); 
+	if (orient == 0) return 0; // collinear
+	return (orient > 0)? 1: 2; // clock or counterclock wise 
+}
+
+function onSegment(p, q, r) { 
+  if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && 
+      q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y)) return true; 
+  return false; 
+} 
 
 
 // Computes penalty forces between all point-edge pairs
