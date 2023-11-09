@@ -550,8 +550,15 @@ class Blob {
 	gatherForces_Stretch() {
 		let k = STIFFNESS_STRETCH;
 		for (let edge of this.BE) {
-			// TODO
-
+			let p_k = edge.q.p;
+			let p_l = edge.r.p;
+			let magDiff = p5.Vector.sub(p_k, p_l).mag();
+			let diffVec = p5.Vector.sub(p_k, p_l).normalize();
+			let multiplier = k * (magDiff - edge.restLength) / magDiff;
+			let f_k = diffVec.mult(multiplier);
+			let f_l = p5.Vector.mult(f_k, -1);
+			edge.q.f.add(f_k);
+			edge.r.f.add(f_l);
 		}
 	}
 	// Loops over blob particles and accumulates bending forces (Particle.f += ...)
