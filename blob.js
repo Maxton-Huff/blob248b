@@ -9,14 +9,13 @@
  * @author Doug L. James <djames@cs.stanford.edu> 
  * @date 10/28/2022
  */
-
 const D0 = 5
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
-const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 1.0; //    TODO: Set as you wish
-const STIFFNESS_AREA = 1.0; //    TODO: Set as you wish
+const STIFFNESS_STRETCH = 100.0; // TODO: Set as you wish
+const STIFFNESS_BEND = 100.0; //    TODO: Set as you wish
+const STIFFNESS_AREA = 10.0; //    TODO: Set as you wish
 
 const WIDTH = 1024;
 const HEIGHT = 1024;
@@ -56,8 +55,8 @@ function draw() {
 	///// SIMULATE /////
 	if (!isPaused) {
 		// CREATE BLOBS 
-		if (nTimesteps % 10 == 0) { 
-			if (blobs.length < MAX_BLOBS) 
+		if (nTimesteps % 10 == 0) {
+			if (blobs.length < MAX_BLOBS)
 				createRandomBlob(); // tries to create one if free space available
 		}
 
@@ -129,7 +128,7 @@ function advanceTime(dt) {
 	//////////////////////////////////////////
 	// Collision filter: Correct velocities //
 	applyPointEdgeCollisionFilter();
-
+	verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
 	//////////////////////////////////////////
 	// Update positions:
 	for (let particle of particles)
@@ -170,10 +169,23 @@ function verifyNoEdgeEdgeOverlap() {
 	}
 }
 
+// Function to check if two edges overlap (COULD BE INCORRECT)
 function checkEdgeEdgeOverlap(ei, ej) {
-	// TODO: Implement robust-enough test. 
-	return false;
+	const dx1 = ei.q.p.x - ei.r.p.x;
+	const dy1 = ei.q.p.y - ei.r.p.y;
+	const dx2 = ej.q.p.x - ej.r.p.x;
+	const dy2 = ej.q.p.y - ej.r.p.y;
+	const determinant = dx1 * dy2 - dx2 * dy1;
+
+	if (determinant === 0) {
+		// Line segments are parallel, and there can be no intersection
+		return false;
+	}
+	const t1 = ((ej.q.p.x - ei.r.p.x) * dy2 - (ej.q.p.y - ei.r.p.y) * dx2) / determinant;
+  const t2 = ((ej.q.p.x - ei.r.p.x) * dy1 - (ej.q.p.y - ei.r.p.y) * dx1) / determinant;
+  return t1 >= 0 && t1 <= 1 && t2 >= 0 && t2 <= 1;
 }
+
 
 // Computes penalty forces between all point-edge pairs
 function gatherParticleForces_Penalty() {
@@ -517,71 +529,69 @@ class Blob {
 
 		}
 	}
-// Loops over blob particles and accumulates bending forces (Particle.f += ...)
-gatherForces_Bend() {
-	let k = STIFFNESS_BEND;
-  	for (let i = 0; i < this.n; i++) {
-		let prevIdx = (i - 1 + this.n) % this.n;
-		let nextIdx = (i + 1) % this.n;
-		let p0 = this.BP[prevIdx];
-		let p1 = this.BP[i];
-		let p2 = this.BP[nextIdx];
-		
-		let edge1 = p5.Vector.sub(p1.p, p0.p);
-		let edge2 = p5.Vector.sub(p2.p, p1.p);
-		let edge1Length = length(edge1);
-		let edge2Length = length(edge2);
-		edge1.normalize();
-		edge2.normalize();
-		let edge1Copy = edge1.copy();
-		let edge2Copy = edge2.copy();
-		let dotted = dot(edge1, edge2)
-		
-		edge1Copy.mult(-1)
-		acc(edge2Copy, dotted, edge1)
-		edge2Copy.mult(-k / (2 * edge1Length))
-		let f0 = edge2Copy;
-		
-		edge1Copy = edge1.copy();
-		edge2Copy = edge2.copy();
-		edge2Copy.mult(-1);
-		acc(edge1Copy, dotted, edge2)
-		edge1Copy.mult(-k / (2 * edge2Length))
-		let f2 = edge1Copy;
-		let f1 = -f0 - f2;
-		
-		p0.f.add(f0);
-		p1.f.add(f1);
-		p2.f.add(f2);
+	// Loops over blob particles and accumulates bending forces (Particle.f += ...)
+	gatherForces_Bend() {
+		let k = STIFFNESS_BEND;
+		for (let i = 0; i < this.n; i++) {
+			let prevIdx = (i - 1 + this.n) % this.n;
+			let nextIdx = (i + 1) % this.n;
+			let p0 = this.BP[prevIdx];
+			let p1 = this.BP[i];
+			let p2 = this.BP[nextIdx];
+
+			let edge1 = p5.Vector.sub(p1.p, p0.p);
+			let edge2 = p5.Vector.sub(p2.p, p1.p);
+			let edge1Length = length(edge1);
+			let edge2Length = length(edge2);
+			edge1.normalize();
+			edge2.normalize();
+			let edge1Copy = edge1.copy();
+			let edge2Copy = edge2.copy();
+			let dotted = dot(edge1, edge2)
+
+			edge1Copy.mult(-1)
+			acc(edge2Copy, dotted, edge1)
+			edge2Copy.mult(-k / (2 * edge1Length))
+			let f0 = edge2Copy;
+
+			edge1Copy = edge1.copy();
+			edge2Copy = edge2.copy();
+			edge2Copy.mult(-1);
+			acc(edge1Copy, dotted, edge2)
+			edge1Copy.mult(-k / (2 * edge2Length))
+			let f2 = edge1Copy;
+			let f1 = -f0 - f2;
+
+			p0.f.add(f0);
+			p1.f.add(f1);
+			p2.f.add(f2);
+		}
 	}
-}
 
-// Loops over blob particles and gathers area compression forces (Particle.f += ...)
-gatherForces_Area() {
-    let k = .8;
-
-    let area = 0;
-    for (let i = 0; i < this.n; i++) {
-        let j = (i + 1) % this.n;
-        area += this.BP[i].p.x * this.BP[j].p.y;
-        area -= this.BP[j].p.x * this.BP[i].p.y;
-    }
-    area = Math.abs(area)/2;
-    let restArea = Math.PI * this.radius * this.radius;
-    let areaDifference = area - restArea;
+	// Loops over blob particles and gathers area compression forces (Particle.f += ...)
+	gatherForces_Area() {
+		let area = 0;
+		for (let i = 0; i < this.n; i++) {
+			let j = (i + 1) % this.n;
+			area += this.BP[i].p.x * this.BP[j].p.y;
+			area -= this.BP[j].p.x * this.BP[i].p.y;
+		}
+		area = Math.abs(area) / 2;
+		let restArea = Math.PI * this.radius * this.radius;
+		let areaDifference = area - restArea;
 		console.log('area', areaDifference);
- 
-    if (areaDifference > 0) {
-        let com = this.centerOfMass(); // Use the centerOfMass() method you already have
 
-        for (let i = 0; i < this.n; i++) {
-            let particle = this.BP[i];
-            let dir = p5.Vector.sub(com, particle.p).normalize();
-            let forceMagnitude = k * areaDifference;
-            particle.f.add(dir.mult(forceMagnitude));
-        }
-    }
-}
+		if (areaDifference > 0) {
+			let com = this.centerOfMass(); // Use the centerOfMass() method you already have
+
+			for (let i = 0; i < this.n; i++) {
+				let particle = this.BP[i];
+				let dir = p5.Vector.sub(com, particle.p).normalize();
+				let forceMagnitude = STIFFNESS_AREA * areaDifference;
+				particle.f.add(dir.mult(forceMagnitude));
+			}
+		}
+	}
 
 
 
@@ -661,59 +671,59 @@ gatherForces_Area() {
 		pop();
 	}
 
-drawBlobFace() {
-  push();
-  let com = this.centerOfMass();
-  let eyeSpacing = this.radius / 3; 
-  let eyeSize = this.radius / 5;
+	drawBlobFace() {
+		push();
+		let com = this.centerOfMass();
+		let eyeSpacing = this.radius / 3;
+		let eyeSize = this.radius / 5;
 
-  // Eyes
-  fill(255); 
-  ellipse(com.x - eyeSpacing, com.y, eyeSize, eyeSize); 
-  ellipse(com.x + eyeSpacing, com.y, eyeSize, eyeSize); 
-	
-  // Pupils
-  fill(0); 
-  let pupilSize = eyeSize / 2;
-  ellipse(com.x - eyeSpacing, com.y, pupilSize, pupilSize); 
-  ellipse(com.x + eyeSpacing, com.y, pupilSize, pupilSize); 
+		// Eyes
+		fill(255);
+		ellipse(com.x - eyeSpacing, com.y, eyeSize, eyeSize);
+		ellipse(com.x + eyeSpacing, com.y, eyeSize, eyeSize);
 
-  // Mouth
-  let mouthWidth = this.radius / 2;
-  let mouthHeight = this.radius / 10;
-  let mouthYOffset = eyeSize * 1.5; 
-  noFill();
-  stroke(0);
-  strokeWeight(2);
-  arc(com.x, com.y + mouthYOffset, mouthWidth, mouthHeight, 0, PI); 
+		// Pupils
+		fill(0);
+		let pupilSize = eyeSize / 2;
+		ellipse(com.x - eyeSpacing, com.y, pupilSize, pupilSize);
+		ellipse(com.x + eyeSpacing, com.y, pupilSize, pupilSize);
 
-  pop();
-}
+		// Mouth
+		let mouthWidth = this.radius / 2;
+		let mouthHeight = this.radius / 10;
+		let mouthYOffset = eyeSize * 1.5;
+		noFill();
+		stroke(0);
+		strokeWeight(2);
+		arc(com.x, com.y + mouthYOffset, mouthWidth, mouthHeight, 0, PI);
+
+		pop();
+	}
 
 
 
 
 
 	aabb() {
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
+		let minX = Infinity;
+		let maxX = -Infinity;
+		let minY = Infinity;
+		let maxY = -Infinity;
 
-    for (let particle of this.BP) {
-        if (particle.p.x < minX) minX = particle.p.x;
-        if (particle.p.x > maxX) maxX = particle.p.x;
-        if (particle.p.y < minY) minY = particle.p.y;
-        if (particle.p.y > maxY) maxY = particle.p.y;
-    }
+		for (let particle of this.BP) {
+			if (particle.p.x < minX) minX = particle.p.x;
+			if (particle.p.x > maxX) maxX = particle.p.x;
+			if (particle.p.y < minY) minY = particle.p.y;
+			if (particle.p.y > maxY) maxY = particle.p.y;
+		}
 
-    return {
-        minX: minX,
-        maxX: maxX,
-        minY: minY,
-        maxY: maxY
-    };
-}
+		return {
+			minX: minX,
+			maxX: maxX,
+			minY: minY,
+			maxY: maxY
+		};
+	}
 
 }
 
