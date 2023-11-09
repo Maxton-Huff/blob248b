@@ -169,37 +169,47 @@ function verifyNoEdgeEdgeOverlap() {
 	}
 }
 
-// Function to check if two edges overlap (INCORRECT)
+// Function to check if two edges overlap
 function checkEdgeEdgeOverlap(ei, ej) {
 	let p1 = ei.q.p;
 	let p2 = ei.r.p;
 	let q1 = ej.q.p;
 	let q2 = ej.r.p;
+	if (samePoint(p1, p2, q1, q2)) return false;
 	let o1 = orientation(p1, p2, q1); 
 	let o2 = orientation(p1, p2, q2); 
 	let o3 = orientation(q1, q2, p1); 
 	let o4 = orientation(q1, q2, p2);
-	print("orientations: ", o1,o2,o3,o4);
+	//print("orientations: ", o1,o2,o3,o4);
 	if (o1 != o2 && o3 != o4 && o1 && o2 && o3 && o4) return true;
-	// if (o1 == 0 && onSegment(p1, p2, q1)) return true; 
-	// if (o2 == 0 && onSegment(p1, q2, q1)) return true; 
-	// if (o3 == 0 && onSegment(p2, p1, q2)) return true; 
-	// if (o4 == 0 && onSegment(p2, q1, q2)) return true; 
+	if (o1 == 0 && onSegment(p1, p2, q1)) return true; 
+	if (o2 == 0 && onSegment(p1, q2, q1)) return true; 
+	if (o3 == 0 && onSegment(p2, p1, q2)) return true; 
+	if (o4 == 0 && onSegment(p2, q1, q2)) return true; 
 	return false; // Doesn't fall in any of the above cases
 }
 
 function orientation(p, q, r) {
-	print("points: ", p,q,r);
+	//print("points: ", p,q,r);
 	let orient = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y); 
 	if (orient == 0) return 0; // collinear
 	return (orient > 0)? 1: 2; // clock or counterclock wise 
 }
 
 function onSegment(p, q, r) { 
-  if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && 
-      q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y)) return true; 
-  return false; 
+	if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && 
+		q.y <= Math.max(p.y, r.y) && q.y >= Math.min(p.y, r.y)) return true; 
+	return false; 
 } 
+
+function samePoint(p1, p2, q1, q2) {
+	let epsilon = 10^(-6);
+	if (p5.Vector.sub(p1,q1).mag() <= -1 * epsilon && p5.Vector.sub(p1,q1).mag() >= epsilon) return true;
+	if (p5.Vector.sub(p1,q2).mag() <= -1 * epsilon && p5.Vector.sub(p1,q2).mag() >= epsilon) return true;
+	if (p5.Vector.sub(p2,q1).mag() <= -1 * epsilon && p5.Vector.sub(p2,q1).mag() >= epsilon) return true;
+	if (p5.Vector.sub(p2,q2).mag() <= -1 * epsilon && p5.Vector.sub(p2,q2).mag() >= epsilon) return true;
+	return false;
+}
 
 
 // Computes penalty forces between all point-edge pairs
