@@ -592,8 +592,7 @@ class Blob {
 			acc(edge1Copy, dotted, edge2)
 			edge1Copy.mult(-k / (2 * edge2Length))
 			let f2 = edge1Copy;
-			let f1 = -f0 - f2;
-
+			let f1 = p5.Vector.sub(p5.Vector.mult(f0, -1), f2);
 			p0.f.add(f0);
 			p1.f.add(f1);
 			p2.f.add(f2);
