@@ -600,31 +600,37 @@ class Blob {
 		}
 	}
 
-	// Loops over blob particles and gathers area compression forces (Particle.f += ...)
-	gatherForces_Area() {
-		let area = 0;
-		for (let i = 0; i < this.n; i++) {
-			let j = (i + 1) % this.n;
-			area += this.BP[i].p.x * this.BP[j].p.y;
-			area -= this.BP[j].p.x * this.BP[i].p.y;
-		}
-		area = Math.abs(area) / 2;
-		let restArea = Math.PI * this.radius * this.radius;
-		let areaDifference = area - restArea;
-		console.log('area', areaDifference);
+  gatherForces_Area() {
+    let A = this.calculateArea(); 
+    let A0 = Math.PI * this.radius * this.radius; 
+    let k = STIFFNESS_AREA; // Stiffness coefficient
 
-		if (areaDifference > 0) {
-			let com = this.centerOfMass(); // Use the centerOfMass() method you already have
+    for (let i = 0; i < this.BP.length; i++) {
+        let particle = this.BP[i];
+        let grad = this.areaGradient(i); 
+        let forceMag = -k * (A - A0) * (A - A0); 
+        let force = p5.Vector.mult(grad, forceMag); 
+        particle.f.add(force); 
+    }
+  }
 
-			for (let i = 0; i < this.n; i++) {
-				let particle = this.BP[i];
-				let dir = p5.Vector.sub(com, particle.p).normalize();
-				let forceMagnitude = STIFFNESS_AREA * areaDifference;
-				particle.f.add(dir.mult(forceMagnitude));
-			}
-		}
-	}
-
+  calculateArea() {
+    let area = 0;
+    for (let i = 0; i < this.BP.length; i++) {
+        let j = (i + 1) % this.BP.length;
+        area += this.BP[i].p.x * this.BP[j].p.y - this.BP[j].p.x * this.BP[i].p.y;
+    }
+    return Math.abs(area / 2.0);
+    }
+	
+  areaGradient(index) {
+    let prevIndex = (index - 1 + this.n) % this.n; 
+    let nextIndex = (index + 1) % this.n;
+    let p_prev = this.BP[prevIndex].p;
+    let p_next = this.BP[nextIndex].p;
+    let gradient = p5.Vector.sub(p_prev, p_next).rotate(HALF_PI).mult(0.5);
+    return gradient;
+  }
 
 
 	// Center of mass of all blob particles
