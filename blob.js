@@ -579,20 +579,21 @@ class Blob {
 			edge2.normalize();
 			let edge1Copy = edge1.copy();
 			let edge2Copy = edge2.copy();
-			let dotted = dot(edge1, edge2)
+			let dotted = dot(edge1, edge2);
 
-			edge1Copy.mult(-1)
-			acc(edge2Copy, dotted, edge1)
-			edge2Copy.mult(-k / (2 * edge1Length))
+			edge1Copy.mult(-1);
+			acc(edge2Copy, dotted, edge1Copy);
+			edge2Copy.mult(-k / (2 * edge1Length));
 			let f0 = edge2Copy;
 
 			edge1Copy = edge1.copy();
 			edge2Copy = edge2.copy();
 			edge2Copy.mult(-1);
-			acc(edge1Copy, dotted, edge2)
-			edge1Copy.mult(-k / (2 * edge2Length))
+			acc(edge1Copy, dotted, edge2Copy);
+			edge1Copy.mult(-k / (2 * edge2Length));
 			let f2 = edge1Copy;
 			let f1 = p5.Vector.sub(p5.Vector.mult(f0, -1), f2);
+			
 			p0.f.add(f0);
 			p1.f.add(f1);
 			p2.f.add(f2);
