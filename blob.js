@@ -14,7 +14,7 @@ const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" ch
 const DRAW_BLOB_PARTICLES = true;
 
 const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 10000.0; //    TODO: Set as you wish
+const STIFFNESS_BEND = 100.0; //    TODO: Set as you wish
 const STIFFNESS_AREA = 0.1; //    TODO: Set as you wish
 
 const WIDTH = 1024;
@@ -114,7 +114,7 @@ function advanceTime(dt) {
 			blob.gatherForces_Area();
 		}
 
-		//gatherParticleForces_Penalty();
+		gatherParticleForces_Penalty();
 
 		// Mouse force (modify if you want):
 		applyMouseForce();
@@ -128,7 +128,7 @@ function advanceTime(dt) {
 	//////////////////////////////////////////
 	// Collision filter: Correct velocities //
 	applyPointEdgeCollisionFilter();
-	//verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
+	verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
 	//////////////////////////////////////////
 	// Update positions:
 	for (let particle of particles)
@@ -233,9 +233,9 @@ function gatherParticleForces_Penalty() {
 			let t  = n.dot(xq);
 			let xBar = createVector(t*n.x, t*n.y);
 			xBar.add(q);
-			let α = t / L;
-			α = constrain(α, 0, 1);
-			let xLine = p5.Vector.lerp(q, p, α);
+			let alpha = t / L;
+			alpha = clamp(alpha, 0, 1);
+			let xLine = p5.Vector.lerp(q, p, alpha);
 			let direction = sub(particle.p, xLine);
 			let distance = length(direction);
 			if (distance >= D0) continue;
@@ -244,17 +244,6 @@ function gatherParticleForces_Penalty() {
 				nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
 				particle.f.add(nHat);
 			}
-			//let alpha = dot(qp, sub(qp, rp)) / (length(sub(qp, rp)) ** 2);
-			//alpha = clamp(alpha, 0, 1);
-			//let c = add(edge.q.p, sub(rp, qp).mult(alpha));
-			// let direction = sub(particle.p, c);
-			// let distance = length(direction);
-			// if (distance >= D0) continue;
-			// let nHat = direction.normalize();
-			// if (D0 - distance > 0) {
-			// 	nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
-			// 	particle.f.add(nHat);
-			// }
 		}
 	}
 }
@@ -592,36 +581,33 @@ class Blob {
 		for (let i = 0; i < this.n; i++) {
 			let prevIdx = (i - 1 + this.n) % this.n;
 			let nextIdx = (i + 1) % this.n;
-			let p0 = this.BP[prevIdx];
-			let p1 = this.BP[i];
-			let p2 = this.BP[nextIdx];
-
-			let edge1 = p5.Vector.sub(p1.p, p0.p);
-			let edge2 = p5.Vector.sub(p2.p, p1.p);
-			let edge1Length = length(edge1);
-			let edge2Length = length(edge2);
-			edge1 = edge1.normalize();
-			edge2 = edge2.normalize();
-			let edge1Copy = edge1.copy();
-			let edge2Copy = edge2.copy();
-			let dotted = dot(edge1, edge2);
-
-			edge1Copy.mult(-1);
-			acc(edge2Copy, dotted, edge1Copy);
-			edge2Copy.mult(-k / (2 * edge1Length));
-			let f0 = edge2Copy.copy();
-
-			edge1Copy = edge1.copy();
-			edge2Copy = edge2.copy();
-			edge2Copy.mult(-1);
-			acc(edge1Copy, dotted, edge2Copy);
-			edge1Copy.mult(-k / (2 * edge2Length));
-			let f2 = edge1Copy;
-			let f1 = p5.Vector.sub(p5.Vector.mult(f0, -1), f2);
+			let p0 = this.BP[prevIdx].p;
+			let p1 = this.BP[i].p;
+			let p2 = this.BP[nextIdx].p;
 			
-			p0.f.add(f0);
-			p1.f.add(f1);
-			p2.f.add(f2);
+			let aVec = sub(p1, p0);
+			let bVec = sub(p2, p1);
+			let a = length(aVec);
+			let b = length(bVec);
+			let aHat = p5.Vector.normalize(aVec);
+			let bHat = p5.Vector.normalize(bVec);
+			let aDotb = dot(aHat, bHat);
+			
+			let f_0Mult = (-1 * k) / (2 * a);
+			let f_2Mult = k / (2 * b);
+			let aTimesdot = p5.Vector.mult(aHat, aDotb);
+			let bTimesdot = p5.Vector.mult(bHat, aDotb);
+			let f_0Diff = sub(bHat, aTimesdot);
+			let f_2Diff = sub(aHat, bTimesdot);
+			
+			let f_0 = p5.Vector.mult(f_0Diff, f_0Mult);
+			let f_2 = p5.Vector.mult(f_2Diff, f_2Mult);
+			let negativeF_0 = p5.Vector.mult(f_0, -1);
+			let f_1 = sub(negativeF_0, f_2);
+			
+			this.BP[prevIdx].f.add(f_0);
+			this.BP[i].f.add(f_1);
+			this.BP[nextIdx].f.add(f_2);
 		}
 	}
 
