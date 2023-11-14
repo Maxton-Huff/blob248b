@@ -112,6 +112,7 @@ function advanceTime(dt) {
 			blob.gatherForces_Stretch();
 			blob.gatherForces_Bend();
 			blob.gatherForces_Area();
+			blob.updateBound();
 		}
 
 		gatherParticleForces_Penalty();
@@ -215,31 +216,45 @@ function samePoint(p1, p2, q1, q2) {
 }
 
 
+function areBlobsClose(blob1, blob2) {
+    const aabb1 = blob1.aabb;
+    const aabb2 = blob2.aabb;
+
+    return !(aabb1.maxX < aabb2.minX - D0 || aabb1.minX > aabb2.maxX + D0 ||
+             aabb1.maxY < aabb2.minY - D0 || aabb1.minY > aabb2.maxY + D0);
+}
+
 // Computes penalty forces between all point-edge pairs
-function gatherParticleForces_Penalty() {
-	for (let edge of edges) {
-		// TODO (part2): Apply point-edge force (if pt not on edge!)
-		for (let particle of particles) {
-			if (edge.q == particle || edge.r == particle) {
-				continue;
-			}
-			let p = edge.q.p;
-			let q = edge.r.p;
-			let pq = p5.Vector.sub(p, q);
-			let L = pq.mag()
-			let n = p5.Vector.normalize(pq);
-			let xq = p5.Vector.sub(particle.p, q);
-			let t  = n.dot(xq);
-			let alpha = t / L;
-			alpha = clamp(alpha, 0, 1);
-			let xLine = p5.Vector.lerp(q, p, alpha);
-			let direction = sub(particle.p, xLine);
-			let distance = length(direction);
-			if (distance >= D0) continue;
-			let nHat = p5.Vector.normalize(direction);
-			if (D0 - distance > 0) {
-				nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
-				particle.f.add(nHat);
+function gatherParticleForces_Penalty(blobs) {
+	for (let blob1 of blobs) {
+		for (let blob2 of blobs) {
+        if (blob1 === blob2 || !areBlobsClose(blob1, blob2)) {
+          continue;
+        }
+			for (let edge of edges) {
+				for (let particle of particles) {
+					if (edge.q == particle || edge.r == particle) {
+						continue;
+					}
+					let p = edge.q.p;
+					let q = edge.r.p;
+					let pq = p5.Vector.sub(p, q);
+					let L = pq.mag()
+					let n = p5.Vector.normalize(pq);
+					let xq = p5.Vector.sub(particle.p, q);
+					let t  = n.dot(xq);
+					let alpha = t / L;
+					alpha = clamp(alpha, 0, 1);
+					let xLine = p5.Vector.lerp(q, p, alpha);
+					let direction = sub(particle.p, xLine);
+					let distance = length(direction);
+					if (distance >= D0) continue;
+					let nHat = p5.Vector.normalize(direction);
+					if (D0 - distance > 0) {
+						nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
+						particle.f.add(nHat);
+					}
+				}
 			}
 		}
 	}
@@ -551,6 +566,8 @@ class Blob {
 		this.fillColor = color([221 + random(-dc, dc), 160 + random(-dc, dc), 221 + random(-dc, dc), 255]); // ("Plum"); // 221, 160, 221
 	
 		this.A0 = this.calculateArea();
+		this.aabb
+		this.updateBound();
 	}
 
 	blobParticles() {
@@ -751,7 +768,7 @@ class Blob {
 
 
 
-	aabb() {
+	updateBound() {
 		let minX = Infinity;
 		let maxX = -Infinity;
 		let minY = Infinity;
@@ -763,13 +780,12 @@ class Blob {
 			if (particle.p.y < minY) minY = particle.p.y;
 			if (particle.p.y > maxY) maxY = particle.p.y;
 		}
+		minX -= D0;
+    maxX += D0;
+    minY -= D0;
+    maxY += D0;
 
-		return {
-			minX: minX,
-			maxX: maxX,
-			minY: minY,
-			maxY: maxY
-		};
+    this.aabb = { minX, maxX, minY, maxY };
 	}
 
 }
