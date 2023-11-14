@@ -13,9 +13,9 @@ const D0 = 20
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
-const STIFFNESS_STRETCH = 10.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 10.0; //    TODO: Set as you wish
-const STIFFNESS_AREA = 10.0; //    TODO: Set as you wish
+const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
+const STIFFNESS_BEND = 10000.0; //    TODO: Set as you wish
+const STIFFNESS_AREA = 0.1; //    TODO: Set as you wish
 
 const WIDTH = 1024;
 const HEIGHT = 1024;
@@ -114,7 +114,7 @@ function advanceTime(dt) {
 			blob.gatherForces_Area();
 		}
 
-		gatherParticleForces_Penalty();
+		//gatherParticleForces_Penalty();
 
 		// Mouse force (modify if you want):
 		applyMouseForce();
@@ -128,7 +128,7 @@ function advanceTime(dt) {
 	//////////////////////////////////////////
 	// Collision filter: Correct velocities //
 	applyPointEdgeCollisionFilter();
-	verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
+	//verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
 	//////////////////////////////////////////
 	// Update positions:
 	for (let particle of particles)
@@ -600,8 +600,8 @@ class Blob {
 			let edge2 = p5.Vector.sub(p2.p, p1.p);
 			let edge1Length = length(edge1);
 			let edge2Length = length(edge2);
-			edge1.normalize();
-			edge2.normalize();
+			edge1 = edge1.normalize();
+			edge2 = edge2.normalize();
 			let edge1Copy = edge1.copy();
 			let edge2Copy = edge2.copy();
 			let dotted = dot(edge1, edge2);
@@ -609,7 +609,7 @@ class Blob {
 			edge1Copy.mult(-1);
 			acc(edge2Copy, dotted, edge1Copy);
 			edge2Copy.mult(-k / (2 * edge1Length));
-			let f0 = edge2Copy;
+			let f0 = edge2Copy.copy();
 
 			edge1Copy = edge1.copy();
 			edge2Copy = edge2.copy();
@@ -629,7 +629,7 @@ class Blob {
     let A = this.calculateArea();
 		//print("Areas: ", A0, A);
 		//isPaused = true;
-    let k = STIFFNESS_AREA * 0.1; // Stiffness coefficient
+    let k = STIFFNESS_AREA; // Stiffness coefficient
 
     for (let i = 0; i < this.BP.length; i++) {
         let particle = this.BP[i];
@@ -654,7 +654,8 @@ class Blob {
     let nextIndex = (index + 1) % this.n;
     let p_prev = this.BP[prevIndex].p;
     let p_next = this.BP[nextIndex].p;
-    let gradient = p5.Vector.sub(p_prev, p_next).rotate(HALF_PI).mult(0.5);
+    let gradient = p5.Vector.sub(p_prev, p_next); //.rotate(HALF_PI).mult(0.5);
+		[gradient.x, gradient.y] = [-gradient.y, gradient.x];
     return gradient;
   }
 
