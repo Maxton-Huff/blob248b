@@ -9,12 +9,12 @@
  * @author Doug L. James <djames@cs.stanford.edu> 
  * @date 10/28/2022
  */
-const D0 = 5
+const D0 = 20
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
-const STIFFNESS_STRETCH = 100.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 100.0; //    TODO: Set as you wish
+const STIFFNESS_STRETCH = 10.0; // TODO: Set as you wish
+const STIFFNESS_BEND = 10.0; //    TODO: Set as you wish
 const STIFFNESS_AREA = 10.0; //    TODO: Set as you wish
 
 const WIDTH = 1024;
@@ -204,6 +204,10 @@ function onSegment(p, q, r) {
 
 function samePoint(p1, p2, q1, q2) {
 	let epsilon = 10^(-6);
+	// if (p5.Vector.sub(p1,q1).mag() <= epsilon) return true;
+	// if (p5.Vector.sub(p1,q2).mag() <= epsilon) return true;
+	// if (p5.Vector.sub(p2,q1).mag() <= epsilon) return true;
+	// if (p5.Vector.sub(p2,q2).mag() <= epsilon) return true;
 	if (p5.Vector.sub(p1,q1).mag() <= -1 * epsilon && p5.Vector.sub(p1,q1).mag() >= epsilon) return true;
 	if (p5.Vector.sub(p1,q2).mag() <= -1 * epsilon && p5.Vector.sub(p1,q2).mag() >= epsilon) return true;
 	if (p5.Vector.sub(p2,q1).mag() <= -1 * epsilon && p5.Vector.sub(p2,q1).mag() >= epsilon) return true;
@@ -220,18 +224,37 @@ function gatherParticleForces_Penalty() {
 			if (edge.q == particle || edge.r == particle) {
 				continue;
 			}
-			let qp = sub(edge.q.p, particle.p);
-			let rp = sub(edge.r.p, particle.p);
-			let alpha = dot(qp, sub(qp, rp)) / (length(sub(qp, rp)) ** 2);
-			alpha = clamp(alpha, 0, 1);
-			let c = add(qp, sub(rp, qp).mult(alpha));
-			let distance = length(c);
+			let p = edge.q.p;
+			let q = edge.r.p;
+			let pq = p5.Vector.sub(p, q);
+			let L = pq.mag()
+			let n = pq.normalize();
+			let xq = p5.Vector.sub(particle.p, q);
+			let t  = n.dot(xq);
+			let xBar = createVector(t*n.x, t*n.y);
+			xBar.add(q);
+			let α = t / L;
+			α = constrain(α, 0, 1);
+			let xLine = p5.Vector.lerp(q, p, α);
+			let direction = sub(particle.p, xLine);
+			let distance = length(direction);
 			if (distance >= D0) continue;
-			let nHat = c.normalize();
+			let nHat = direction.normalize();
 			if (D0 - distance > 0) {
 				nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
 				particle.f.add(nHat);
 			}
+			//let alpha = dot(qp, sub(qp, rp)) / (length(sub(qp, rp)) ** 2);
+			//alpha = clamp(alpha, 0, 1);
+			//let c = add(edge.q.p, sub(rp, qp).mult(alpha));
+			// let direction = sub(particle.p, c);
+			// let distance = length(direction);
+			// if (distance >= D0) continue;
+			// let nHat = direction.normalize();
+			// if (D0 - distance > 0) {
+			// 	nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
+			// 	particle.f.add(nHat);
+			// }
 		}
 	}
 }
@@ -540,6 +563,8 @@ class Blob {
 		// TODO
 		let dc = 26;
 		this.fillColor = color([221 + random(-dc, dc), 160 + random(-dc, dc), 221 + random(-dc, dc), 255]); // ("Plum"); // 221, 160, 221
+	
+		this.A0 = this.calculateArea();
 	}
 
 	blobParticles() {
@@ -554,7 +579,7 @@ class Blob {
 			let p_l = edge.r.p;
 			let magDiff = p5.Vector.sub(p_k, p_l).mag();
 			let diffVec = p5.Vector.sub(p_k, p_l).normalize();
-			let multiplier = k * (magDiff - edge.restLength) / magDiff;
+			let multiplier = -k * (magDiff - edge.restLength); // / magDiff;
 			let f_k = diffVec.mult(multiplier);
 			let f_l = p5.Vector.mult(f_k, -1);
 			edge.q.f.add(f_k);
@@ -601,16 +626,17 @@ class Blob {
 	}
 
   gatherForces_Area() {
-    let A = this.calculateArea(); 
-    let A0 = Math.PI * this.radius * this.radius; 
-    let k = STIFFNESS_AREA; // Stiffness coefficient
+    let A = this.calculateArea();
+		//print("Areas: ", A0, A);
+		//isPaused = true;
+    let k = STIFFNESS_AREA * 0.1; // Stiffness coefficient
 
     for (let i = 0; i < this.BP.length; i++) {
         let particle = this.BP[i];
-        let grad = this.areaGradient(i); 
-        let forceMag = -k * (A - A0) * (A - A0); 
-        let force = p5.Vector.mult(grad, forceMag); 
-        particle.f.add(force); 
+        let grad = this.areaGradient(i);
+        let forceMag = -k * (A - this.A0);
+        let force = p5.Vector.mult(grad, forceMag);
+        particle.f.add(force);
     }
   }
 
