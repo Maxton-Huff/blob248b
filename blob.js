@@ -9,12 +9,12 @@
  * @author Doug L. James <djames@cs.stanford.edu> 
  * @date 10/28/2022
  */
-const D0 = 20
+const D0 = 10;
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
 const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 100.0; //    TODO: Set as you wish
+const STIFFNESS_BEND = 100000.0; //    TODO: Set as you wish
 const STIFFNESS_AREA = 0.1; //    TODO: Set as you wish
 
 const WIDTH = 1024;
@@ -128,7 +128,7 @@ function advanceTime(dt) {
 	//////////////////////////////////////////
 	// Collision filter: Correct velocities //
 	applyPointEdgeCollisionFilter();
-	verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
+	//verifyNoEdgeEdgeOverlap(); // TODO: Check if this works
 	//////////////////////////////////////////
 	// Update positions:
 	for (let particle of particles)
@@ -175,6 +175,8 @@ function checkEdgeEdgeOverlap(ei, ej) {
 	let p2 = ei.r.p;
 	let q1 = ej.q.p;
 	let q2 = ej.r.p;
+	// isPaused = true;
+	// print(samePoint(p1, p2, q1, q2));
 	if (samePoint(p1, p2, q1, q2)) return false;
 	let o1 = orientation(p1, p2, q1); 
 	let o2 = orientation(p1, p2, q2); 
@@ -203,15 +205,12 @@ function onSegment(p, q, r) {
 } 
 
 function samePoint(p1, p2, q1, q2) {
-	let epsilon = 10^(-6);
-	// if (p5.Vector.sub(p1,q1).mag() <= epsilon) return true;
-	// if (p5.Vector.sub(p1,q2).mag() <= epsilon) return true;
-	// if (p5.Vector.sub(p2,q1).mag() <= epsilon) return true;
-	// if (p5.Vector.sub(p2,q2).mag() <= epsilon) return true;
-	if (p5.Vector.sub(p1,q1).mag() <= -1 * epsilon && p5.Vector.sub(p1,q1).mag() >= epsilon) return true;
-	if (p5.Vector.sub(p1,q2).mag() <= -1 * epsilon && p5.Vector.sub(p1,q2).mag() >= epsilon) return true;
-	if (p5.Vector.sub(p2,q1).mag() <= -1 * epsilon && p5.Vector.sub(p2,q1).mag() >= epsilon) return true;
-	if (p5.Vector.sub(p2,q2).mag() <= -1 * epsilon && p5.Vector.sub(p2,q2).mag() >= epsilon) return true;
+	let epsilon = 10**(-6);
+	//print(epsilon);
+	if (p5.Vector.sub(p1,q1).mag() <= epsilon) return true;
+	if (p5.Vector.sub(p1,q2).mag() <= epsilon) return true;
+	if (p5.Vector.sub(p2,q1).mag() <= epsilon) return true;
+	if (p5.Vector.sub(p2,q2).mag() <= epsilon) return true;
 	return false;
 }
 
@@ -228,18 +227,16 @@ function gatherParticleForces_Penalty() {
 			let q = edge.r.p;
 			let pq = p5.Vector.sub(p, q);
 			let L = pq.mag()
-			let n = pq.normalize();
+			let n = p5.Vector.normalize(pq);
 			let xq = p5.Vector.sub(particle.p, q);
 			let t  = n.dot(xq);
-			let xBar = createVector(t*n.x, t*n.y);
-			xBar.add(q);
 			let alpha = t / L;
 			alpha = clamp(alpha, 0, 1);
 			let xLine = p5.Vector.lerp(q, p, alpha);
 			let direction = sub(particle.p, xLine);
 			let distance = length(direction);
 			if (distance >= D0) continue;
-			let nHat = direction.normalize();
+			let nHat = p5.Vector.normalize(direction);
 			if (D0 - distance > 0) {
 				nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
 				particle.f.add(nHat);
@@ -566,13 +563,13 @@ class Blob {
 		for (let edge of this.BE) {
 			let p_k = edge.q.p;
 			let p_l = edge.r.p;
-			let magDiff = p5.Vector.sub(p_k, p_l).mag();
-			let diffVec = p5.Vector.sub(p_k, p_l).normalize();
-			let multiplier = -k * (magDiff - edge.restLength); // / magDiff;
-			let f_k = diffVec.mult(multiplier);
-			let f_l = p5.Vector.mult(f_k, -1);
+			let diff = sub(p_k, p_l);
+			let magDiff = diff.mag();
+			let diffVec = p5.Vector.normalize(diff);
+			let multiplier = -k * (magDiff - edge.lengthRest());
+			let f_k = p5.Vector.mult(diffVec, multiplier);
 			edge.q.f.add(f_k);
-			edge.r.f.add(f_l);
+			edge.r.f.sub(f_k);
 		}
 	}
 	// Loops over blob particles and accumulates bending forces (Particle.f += ...)
@@ -601,6 +598,7 @@ class Blob {
 			let f_2Diff = sub(aHat, bTimesdot);
 			
 			let f_0 = p5.Vector.mult(f_0Diff, f_0Mult);
+			
 			let f_2 = p5.Vector.mult(f_2Diff, f_2Mult);
 			let negativeF_0 = p5.Vector.mult(f_0, -1);
 			let f_1 = sub(negativeF_0, f_2);
@@ -630,7 +628,7 @@ class Blob {
     let area = 0;
     for (let i = 0; i < this.BP.length; i++) {
         let j = (i + 1) % this.BP.length;
-        area += this.BP[i].p.x * this.BP[j].p.y - this.BP[j].p.x * this.BP[i].p.y;
+        area += (this.BP[i].p.x * this.BP[j].p.y) - (this.BP[j].p.x * this.BP[i].p.y);
     }
     return Math.abs(area / 2.0);
     }
@@ -750,8 +748,6 @@ class Blob {
 
 		pop();
 	}
-
-
 
 
 
