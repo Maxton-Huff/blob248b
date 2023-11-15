@@ -10,12 +10,12 @@
  * @date 10/28/2022
  */
 const D0 = 10;
-const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
+const MAX_BLOBS = 2; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
 const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
 const STIFFNESS_BEND = 100000.0; //    TODO: Set as you wish
-const STIFFNESS_AREA = 0.1; //    TODO: Set as you wish
+const STIFFNESS_AREA = 0.9; //    TODO: Set as you wish
 
 const WIDTH = 1024;
 const HEIGHT = 1024;
@@ -137,18 +137,72 @@ function advanceTime(dt) {
 }
 
 function applyPointEdgeCollisionFilter() {
-	// TEMP HACK (remove!): rigid bounce off walls so they don't fly away
-	for (let blob of blobs) blob.nonrigidBounceOnWalls();
+    const restitution = 0.8; // Coefficient of restitution
 
-	// TODO: Process all point-edge CCD impulses 
-	// FIRST: Just rigid edges.
-	let edgesToCheck = environment.getEdges();
-	// SECOND: All rigid + blob edges (once you get this ^^ working)
-	// edgesToCheck = edges;
+    for (let blob of blobs) {
+        //blob.nonrigidBounceOnWalls();
 
-	// Initially just brute force all-pairs checks, later use bounding volumes or better broad phase.
-
+        // Check collisions between blob edges and environment edges
+        let edgesToCheck = environment.getEdges(); // Get all edges to check for collisions
+        for (let blobEdge of blob.BE) {
+            for (let edge of edgesToCheck) {
+                if (checkEdgeEdgeOverlap(blobEdge, edge)) {
+										console.log('collision')
+                    //applyImpulse(blob, blobEdge, edge, restitution);
+                }
+            }
+        }
+    }
 }
+
+function applyImpulse(blob, blobEdge, edge, restitution) {
+    let mp = 1, mq = 1, mr = 1, alpha = 0.5;
+    let Meff = 1 / (1/mp + alpha*alpha/mq + alpha*alpha/mr);
+
+    for (let particle of blob.BP) {
+
+        let normal = { x: -edge.y, y: edge.x };
+        let normalMagnitude = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+        normal.x /= normalMagnitude; 
+        normal.y /= normalMagnitude;        
+		    let v_n_minus = particle.v.x * normal.x + particle.v.y * normal.y;
+
+        let gamma = (1 + restitution) * Meff * (-v_n_minus);
+
+    		// Apply the impulse to the particle's velocity
+    		particle.v.x += gamma * normal.x;
+    		particle.v.y += gamma * normal.y;
+    }
+}
+
+function applyRigidCollisionResponse(blob, blobEdge, edge, restitution) {
+    let edgeVector = { x: edge.end.x - edge.start.x, y: edge.end.y - edge.start.y };
+
+    let normal = { x: -edgeVector.y, y: edgeVector.x };
+    let normalMagnitude = Math.sqrt(normal.x * normal.x + normal.y * normal.y);
+    normal.x /= normalMagnitude; 
+    normal.y /= normalMagnitude;
+
+    blob.BP.forEach(particle => {
+        let v_along_normal = particle.v.x * normal.x + particle.v.y * normal.y;
+        let impulseMagnitude = -restitution * v_along_normal;
+        particle.v.x += impulseMagnitude * normal.x;
+        particle.v.y += impulseMagnitude * normal.y;
+    });
+}
+
+
+function applyRigidCollisionResponse(blob, collisionNormal, restitution) {
+    for (let particle of blob.BP) {
+        let incomingVelocityNormal = (particle.v.x * collisionNormal.x + particle.v.y * collisionNormal.y);
+
+        let impulseMagnitude = -restitution * incomingVelocityNormal; // Assuming unit mass for simplicity
+
+        particle.v.x += impulseMagnitude * collisionNormal.x;
+        particle.v.y += impulseMagnitude * collisionNormal.y;
+    }
+}
+
 
 // Efficiently checks that no pair of edges overlap, where the pairs do not share a particle in common.
 function verifyNoEdgeEdgeOverlap() {
@@ -225,7 +279,7 @@ function areBlobsClose(blob1, blob2) {
 }
 
 // Computes penalty forces between all point-edge pairs
-function gatherParticleForces_Penalty(blobs) {
+function gatherParticleForces_Penalty(f) {
 	for (let blob1 of blobs) {
 		for (let blob2 of blobs) {
         if (blob1 === blob2 || !areBlobsClose(blob1, blob2)) {
