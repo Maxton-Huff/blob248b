@@ -10,7 +10,7 @@
  * @date 10/28/2022
  */
 const D0 = 10;
-const MAX_BLOBS = 5; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
+const MAX_BLOBS = 100; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
 const STIFFNESS_STRETCH = 2000.0; // TODO: Set as you wish
@@ -138,18 +138,96 @@ function advanceTime(dt) {
 }
 
 function applyPointEdgeCollisionFilter() {
-	// TEMP HACK (remove!): rigid bounce off walls so they don't fly away
-	for (let blob of blobs) blob.nonrigidBounceOnWalls();
+    let collisions;
+    const restitution = 0.8; // Coefficient of restitution for the collisions
 
-	// TODO: Process all point-edge CCD impulses 
-	// FIRST: Just rigid edges.
-	let edgesToCheck = environment.getEdges();
-	// SECOND: All rigid + blob edges (once you get this ^^ working)
-	// edgesToCheck = edges;
+    // TEMP HACK: Nonrigid bounce off walls so they don't fly away
+    for (let blob of blobs) {
+        blob.nonrigidBounceOnWalls();
+    }
 
-	// Initially just brute force all-pairs checks, later use bounding volumes or better broad phase.
+    do {
+        collisions = detectPtLineCollisions(blobs, environment.getEdges());    
+
+        for (let collision of collisions) {
+					  let normal = createVector(-collision.edge.y, collision.edge.x);
+            normal.normalize(); 
+            applyImpulse(collision.particle,collision.edge, normal, restitution);
+        }
+
+        collisions = detectPtLineCollisions(blobs, environment.getEdges());
+    } while (collisions.length > 0);
 
 }
+
+function detectPtLineCollisions(blobs, edges) {
+    let collisions = [];
+
+    for (let blob of blobs) {
+        for (let particle of blob.BP) {
+            let p = createVector(particle.p.x, particle.p.y);
+            let p_dot = createVector(particle.v.x, particle.v.y);
+
+            for (let edge of edges) {
+                let q = createVector(edge.q.x, edge.q.y);
+                let r = createVector(edge.r.x, edge.r.y);
+                let q_dot = createVector(edge.q.v.x, edge.q.v.y);
+                let r_dot = createVector(edge.r.v.x, edge.r.v.y);
+
+                let a = p5.Vector.sub(r, q);
+                let a_dot = p5.Vector.sub(r_dot, q_dot);
+                let b = p5.Vector.sub(p, q);
+                let b_dot = p5.Vector.sub(p_dot, q_dot);
+
+                let A = p5.Vector.cross(a, a_dot).z;
+                let B = p5.Vector.cross(a, b_dot).z + p5.Vector.cross(a_dot, b).z;
+                let C = p5.Vector.cross(b, b_dot).z;
+
+                let discriminant = B * B - 4 * A * C;
+                if (discriminant >= 0) {
+                    let t1 = (-B + Math.sqrt(discriminant)) / (2 * A);
+                    let t2 = (-B - Math.sqrt(discriminant)) / (2 * A);
+
+                    if ((t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1)) {
+                        collisions.push({ particle: particle, edge: edge });
+                    }
+                }
+            }
+        }
+    }
+
+    return collisions;
+}
+
+function applyImpulse(particle, edge, normal, restitution) {
+    let w_p = particle.invMass();
+    let w_q = edge.q.invMass();
+    let w_r = edge.r.invMass();
+
+    let alpha = 0.5; 
+
+    let Meff = 1 / (w_p + alpha * alpha * w_q + alpha * alpha * w_r);
+
+    let p_dot = createVector(particle.v.x, particle.v.y);
+    let q_dot = createVector(edge.q.v.x, edge.q.v.y);
+    let r_dot = createVector(edge.r.v.x, edge.r.v.y);
+    let c_dot = p5.Vector.add(p5.Vector.mult(q_dot, alpha), p5.Vector.mult(r_dot, (1 - alpha)));
+    let relativeVelocity = p5.Vector.sub(p_dot, c_dot);
+    let v_n_minus = relativeVelocity.dot(normal);
+
+    let gamma = (1 + restitution) * Meff * (-v_n_minus);
+
+    let impulse = p5.Vector.mult(normal, gamma);
+    particle.v.add(p5.Vector.mult(impulse, w_p));
+
+    if (edge.q.mass !== Infinity) {  // Checking if the particle is not immovable
+        edge.q.v.sub(p5.Vector.mult(impulse, alpha * w_q));
+    }
+    if (edge.r.mass !== Infinity) {
+        edge.r.v.add(p5.Vector.mult(impulse, (1 - alpha) * w_r));
+    }
+}
+
 
 // Efficiently checks that no pair of edges overlap, where the pairs do not share a particle in common.
 function verifyNoEdgeEdgeOverlap() {
