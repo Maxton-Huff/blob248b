@@ -13,9 +13,9 @@ const D0 = 10;
 const MAX_BLOBS = 1; /// TODO: 100 or more to complete "Attack of the Blobs!" challenge. Use just a few for testing. 
 const DRAW_BLOB_PARTICLES = true;
 
-const STIFFNESS_STRETCH = 1000.0; // TODO: Set as you wish
-const STIFFNESS_BEND = 100000.0; //    TODO: Set as you wish
-const STIFFNESS_AREA = 0.9; //    TODO: Set as you wish
+const STIFFNESS_STRETCH = 2000.0;
+const STIFFNESS_BEND = 200000.0;
+const STIFFNESS_AREA = 0.1;
 
 const WIDTH = 1024;
 const HEIGHT = 1024;
@@ -253,6 +253,8 @@ function gatherParticleForces_Penalty(blobs) {
 					if (D0 - distance > 0) {
 						nHat.mult(STIFFNESS_STRETCH * (D0 - distance));
 						particle.f.add(nHat);
+						edge.q.f.sub(nHat.copy().mult(1 - alpha));				
+						edge.r.f.sub(nHat.copy().mult(alpha));
 					}
 				}
 			}
@@ -587,6 +589,13 @@ class Blob {
 			let f_k = p5.Vector.mult(diffVec, multiplier);
 			edge.q.f.add(f_k);
 			edge.r.f.sub(f_k);
+			
+			let dv = sub(edge.q.v, edge.r.v);
+			let rHat = p5.Vector.normalize(diff);
+			let damp = dot(dv, rHat) * k * 0.02;
+			let dampForce = rHat.mult(damp);
+			edge.q.f.sub(dampForce);
+			edge.r.f.add(dampForce);
 		}
 	}
 	// Loops over blob particles and accumulates bending forces (Particle.f += ...)
